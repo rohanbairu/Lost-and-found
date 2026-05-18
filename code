@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CampusTrace — Lost & Found Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --bg2: #111118;
+      --bg3: #18181f;
+      --surface: #1e1e28;
+      --border: rgba(255,255,255,0.07);
+      --border2: rgba(255,255,255,0.13);
+      --cyan: #00f5d4;
+      --lime: #b5ff3c;
+      --coral: #ff5f6d;
+      --amber: #ffbe0b;
+      --purple: #a855f7;
+      --text: #f0f0f8;
+      --muted: #7a7a9a;
+      --card-r: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* NOISE OVERLAY */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0; opacity: 0.4;
+    }
+
+    /* NAVBAR */
+    .navbar {
+      background: rgba(10,10,15,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 300;
+    }
+    .nav-logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px; font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text);
+    }
+    .nav-logo span {
+      color: var(--cyan);
+      text-shadow: 0 0 20px rgba(0,245,212,0.5);
+    }
+    .nav-sub {
+      font-size: 11px; color: var(--muted);
+      margin-left: 10px; letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .nav-btns { display: flex; gap: 10px; }
+
+    .btn-lost {
+      padding: 8px 18px; border-radius: 10px;
+      font-size: 13px; font-weight: 600;
+      background: rgba(255,95,109,0.12);
+      color: var(--coral);
+      border: 1px solid rgba(255,95,109,0.3);
+      cursor: pointer; transition: all 0.2s;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .btn-lost:hover {
+      background: rgba(255,95,109,0.22);
+      box-shadow: 0 0 18px rgba(255,95,109,0.25);
+    }
+    .btn-found {
+      padding: 8px 18px; border-radius: 10px;
+      font-size: 13px; font-weight: 600;
+      background: rgba(0,245,212,0.1);
+      color: var(--cyan);
+      border: 1px solid rgba(0,245,212,0.3);
+      cursor: pointer; transition: all 0.2s;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .btn-found:hover {
+      background: rgba(0,245,212,0.2);
+      box-shadow: 0 0 18px rgba(0,245,212,0.25);
+    }
+
+    /* HERO */
+    .hero {
+      position: relative;
+      padding: 48px 28px 36px;
+      overflow: hidden;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      top: -60px; right: -80px;
+      width: 420px; height: 420px;
+      background: radial-gradient(circle, rgba(0,245,212,0.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(0,245,212,0.08);
+      border: 1px solid rgba(0,245,212,0.2);
+      color: var(--cyan);
+      font-size: 11px; font-weight: 600;
+      padding: 4px 12px; border-radius: 20px;
+      margin-bottom: 16px;
+      text-transform: uppercase; letter-spacing: 1px;
+      animation: fadeUp 0.5s ease both;
+    }
+    .hero h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 36px; font-weight: 800;
+      line-height: 1.1; letter-spacing: -1px;
+      margin-bottom: 10px;
+      animation: fadeUp 0.5s 0.1s ease both;
+    }
+    .hero h1 em { font-style: normal; color: var(--lime); }
+    .hero p {
+      font-size: 14px; color: var(--muted);
+      animation: fadeUp 0.5s 0.2s ease both;
+    }
+    .hero p span { color: var(--cyan); }
+
+    /* STATS */
+    .stats {
+      display: flex; gap: 12px;
+      padding: 0 28px 28px;
+      animation: fadeUp 0.5s 0.3s ease both;
+    }
+    .stat-card {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-r);
+      padding: 18px 20px;
+      position: relative; overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    }
+    .stat-card.red::before { background: var(--coral); box-shadow: 0 0 12px rgba(255,95,109,0.5); }
+    .stat-card.green::before { background: var(--cyan); box-shadow: 0 0 12px rgba(0,245,212,0.5); }
+    .stat-card.gray::before { background: var(--muted); }
+    .stat-num {
+      font-family: 'Syne', sans-serif;
+      font-size: 32px; font-weight: 800;
+    }
+    .stat-num.red { color: var(--coral); text-shadow: 0 0 20px rgba(255,95,109,0.4); }
+    .stat-num.green { color: var(--cyan); text-shadow: 0 0 20px rgba(0,245,212,0.4); }
+    .stat-num.gray { color: var(--text); }
+    .stat-label { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    /* TABS */
+    .section-tabs {
+      display: flex; gap: 0;
+      margin: 0 28px;
+      border-bottom: 1px solid var(--border);
+    }
+    .stab {
+      padding: 12px 22px;
+      font-size: 13px; font-weight: 600;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .stab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+    .stab:hover:not(.active) { color: var(--text); }
+
+    /* CONTROLS */
+    .controls {
+      display: flex; gap: 10px;
+      padding: 20px 28px 12px;
+      align-items: center;
+    }
+    .search-box {
+      flex: 1; height: 40px;
+      border-radius: 10px;
+      border: 1px solid var(--border2);
+      padding: 0 16px;
+      font-size: 13px;
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+      font-family: 'DM Sans', sans-serif;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-box::placeholder { color: var(--muted); }
+    .search-box:focus {
+      border-color: rgba(0,245,212,0.4);
+      box-shadow: 0 0 0 3px rgba(0,245,212,0.08);
+    }
+    .filter-tabs { display: flex; gap: 6px; }
+    .ftab {
+      padding: 7px 16px; border-radius: 20px;
+      font-size: 12px; font-weight: 600;
+      border: 1px solid var(--border2);
+      background: transparent; color: var(--muted);
+      cursor: pointer; transition: all 0.2s;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .ftab.active {
+      background: var(--cyan);
+      color: #0a0a0f;
+      border-color: var(--cyan);
+      box-shadow: 0 0 16px rgba(0,245,212,0.35);
+    }
+    .ftab:hover:not(.active) { color: var(--text); border-color: var(--border2); }
+
+    /* GRID */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px; padding: 8px 28px 60px;
+    }
+
+    /* CARDS */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-r);
+      overflow: hidden;
+      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+      animation: fadeUp 0.4s ease both;
+    }
+    .card:hover {
+      border-color: var(--border2);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+    }
+    .card.urgent {
+      border-color: rgba(255,95,109,0.45);
+      box-shadow: 0 0 0 1px rgba(255,95,109,0.15);
+    }
+    .card.urgent:hover { box-shadow: 0 12px 40px rgba(255,95,109,0.2); }
+
+    .card-img { width: 100%; height: 170px; object-fit: cover; }
+    .card-img-placeholder {
+      width: 100%; height: 90px;
+      background: var(--bg3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .card-body { padding: 16px; }
+    .card-header {
+      display: flex; justify-content: space-between;
+      align-items: flex-start; margin-bottom: 8px; gap: 8px;
+    }
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 15px; font-weight: 700;
+      color: var(--text);
+    }
+    .badges { display: flex; gap: 5px; flex-wrap: wrap; flex-shrink: 0; }
+    .badge {
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.5px; text-transform: uppercase;
+    }
+    .badge-lost {
+      background: rgba(255,95,109,0.12);
+      color: var(--coral);
+      border: 1px solid rgba(255,95,109,0.3);
+    }
+    .badge-found {
+      background: rgba(0,245,212,0.1);
+      color: var(--cyan);
+      border: 1px solid rgba(0,245,212,0.25);
+    }
+    .badge-urgent {
+      background: var(--coral); color: #fff;
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+    .card-desc { font-size: 13px; color: var(--muted); margin-bottom: 12px; line-height: 1.55; }
+    .card-meta {
+      font-size: 12px; color: var(--muted);
+      display: flex; flex-direction: column; gap: 4px;
+      margin-bottom: 14px;
+    }
+    .card-meta span { color: var(--text); opacity: 0.6; }
+    .card-footer {
+      display: flex; gap: 8px;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+    .contact-info {
+      flex: 1; font-size: 12px; color: var(--muted);
+      background: var(--bg3);
+      padding: 7px 10px; border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .delete-btn {
+      padding: 7px 14px; border-radius: 8px;
+      font-size: 12px; font-weight: 700;
+      background: rgba(181,255,60,0.1);
+      color: var(--lime);
+      border: 1px solid rgba(181,255,60,0.25);
+      cursor: pointer; transition: all 0.2s;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .delete-btn:hover {
+      background: rgba(181,255,60,0.2);
+      box-shadow: 0 0 14px rgba(181,255,60,0.2);
+    }
+
+    /* MATCH BANNER */
+    .match-banner {
+      background: rgba(255,190,11,0.1);
+      border: 1px solid rgba(255,190,11,0.3);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px; color: #ffd65c;
+      margin: 0 28px 16px;
+      display: none;
+    }
+    .match-banner.show { display: block; animation: fadeUp 0.3s ease; }
+
+    /* MAP */
+    #mapSection { display: none; padding: 20px 28px 60px; }
+    #mapSection.show { display: block; }
+    #map {
+      height: 450px; border-radius: var(--card-r);
+      border: 1px solid var(--border); z-index: 1;
+    }
+
+    /* HUMANITY SCORE */
+    #humanitySection { display: none; padding: 20px 28px 60px; }
+    #humanitySection.show { display: block; }
+
+    .week-hero {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-r);
+      padding: 24px 28px;
+      display: flex; align-items: center; gap: 20px;
+      margin-bottom: 20px;
+      position: relative; overflow: hidden;
+    }
+    .week-hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(168,85,247,0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .week-hero::after {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--purple), var(--cyan));
+      box-shadow: 0 0 16px rgba(168,85,247,0.5);
+    }
+    .crown { font-size: 44px; line-height: 1; filter: drop-shadow(0 0 16px rgba(255,190,11,0.5)); }
+    .week-info { flex: 1; }
+    .week-label {
+      font-size: 10px; color: var(--muted);
+      font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 4px;
+    }
+    .week-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 22px; font-weight: 800;
+      color: var(--text); margin-bottom: 2px;
+    }
+    .week-sub { font-size: 13px; color: var(--muted); }
+    .week-score {
+      text-align: center;
+      background: rgba(168,85,247,0.1);
+      border: 1px solid rgba(168,85,247,0.3);
+      border-radius: 12px;
+      padding: 16px 22px; min-width: 90px;
+    }
+    .week-score-num {
+      font-family: 'Syne', sans-serif;
+      font-size: 32px; font-weight: 800;
+      color: var(--purple);
+      text-shadow: 0 0 20px rgba(168,85,247,0.5);
+    }
+    .week-score-label { font-size: 10px; color: var(--muted); font-weight: 600; }
+
+    .no-winner {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--card-r); padding: 36px;
+      text-align: center; margin-bottom: 20px;
+      color: var(--muted);
+    }
+    .no-winner h3 { font-size: 16px; color: var(--muted); margin-bottom: 6px; }
+
+    .lb-title {
+      font-size: 13px; font-weight: 700;
+      color: var(--muted); margin-bottom: 12px;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .lb-row {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px 18px;
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 8px; transition: border-color 0.2s;
+    }
+    .lb-row:hover { border-color: var(--border2); }
+    .lb-row.gold { border-color: rgba(255,190,11,0.3); background: rgba(255,190,11,0.04); }
+    .lb-row.silver { border-color: rgba(180,180,180,0.25); }
+    .lb-row.bronze { border-color: rgba(205,127,50,0.25); }
+    .rank { font-size: 20px; width: 30px; text-align: center; flex-shrink: 0; }
+    .avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; flex-shrink: 0;
+      background: rgba(0,245,212,0.1);
+      color: var(--cyan);
+      border: 1px solid rgba(0,245,212,0.2);
+    }
+    .lb-name { flex: 1; }
+    .lb-name-text { font-size: 14px; font-weight: 600; color: var(--text); }
+    .heart-bar {
+      width: 100%; max-width: 110px; height: 4px;
+      background: var(--bg3); border-radius: 4px;
+      overflow: hidden; margin-top: 6px;
+    }
+    .heart-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, var(--cyan), var(--lime));
+      transition: width 0.5s ease;
+    }
+    .lb-score-wrap { text-align: right; }
+    .lb-score {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px; font-weight: 800; color: var(--lime);
+    }
+    .lb-score-label { font-size: 10px; color: var(--muted); }
+    .mini-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+    .mini-badge {
+      padding: 2px 8px; border-radius: 10px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+    }
+    .mb-gold {
+      background: rgba(255,190,11,0.12);
+      color: var(--amber);
+      border: 1px solid rgba(255,190,11,0.3);
+    }
+    .mb-green {
+      background: rgba(181,255,60,0.1);
+      color: var(--lime);
+      border: 1px solid rgba(181,255,60,0.25);
+    }
+    .reset-note { text-align: center; font-size: 12px; color: var(--muted); margin-top: 16px; }
+
+    /* SCORE POPUP */
+    .score-popup {
+      position: fixed; bottom: 80px; right: 24px;
+      background: var(--surface);
+      border: 1px solid rgba(0,245,212,0.3);
+      color: var(--cyan);
+      padding: 12px 20px; border-radius: 12px;
+      font-size: 14px; font-weight: 700;
+      box-shadow: 0 0 30px rgba(0,245,212,0.2);
+      opacity: 0; transform: translateY(10px);
+      transition: all 0.3s; z-index: 999; pointer-events: none;
+    }
+    .score-popup.show { opacity: 1; transform: translateY(0); }
+
+    /* EMPTY STATE */
+    .empty-state {
+      grid-column: 1/-1; text-align: center;
+      padding: 80px 20px; color: var(--muted);
+    }
+    .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: #3a3a4a; }
+
+    /* MODAL */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(6px);
+      z-index: 400; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 18px;
+      padding: 30px; width: 520px;
+      max-width: 96vw; max-height: 92vh;
+      overflow-y: auto;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    }
+    .modal-header {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 22px;
+    }
+    .modal-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px; font-weight: 800;
+      color: var(--text);
+    }
+    .modal-close {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); transition: all 0.2s;
+    }
+    .modal-close:hover { color: var(--text); border-color: var(--border2); }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block; font-size: 12px; font-weight: 700;
+      margin-bottom: 6px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.6px;
+    }
+    .form-group input, .form-group textarea {
+      width: 100%; padding: 10px 14px;
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      font-size: 13px; font-family: 'DM Sans', sans-serif;
+      outline: none;
+      background: var(--surface); color: var(--text);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .form-group input:focus, .form-group textarea:focus {
+      border-color: rgba(0,245,212,0.4);
+      box-shadow: 0 0 0 3px rgba(0,245,212,0.08);
+    }
+    .form-group input::placeholder, .form-group textarea::placeholder { color: var(--muted); }
+    .form-group textarea { resize: vertical; min-height: 75px; }
+
+    .radio-group { display: flex; gap: 16px; }
+    .radio-group label {
+      display: flex; align-items: center; gap: 7px;
+      font-weight: 600; cursor: pointer;
+      font-size: 13px; color: var(--text);
+      text-transform: none; letter-spacing: 0;
+    }
+
+    .urgency-toggle {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px;
+      background: rgba(255,95,109,0.08);
+      border: 1px solid rgba(255,95,109,0.25);
+      border-radius: 10px; cursor: pointer;
+    }
+    .urgency-toggle input { width: auto; }
+    .urgency-toggle span { font-size: 13px; font-weight: 600; color: var(--coral); }
+
+    .photo-preview {
+      width: 100%; height: 130px;
+      border-radius: 10px;
+      border: 2px dashed var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; overflow: hidden;
+      background: var(--surface);
+      transition: border-color 0.2s;
+    }
+    .photo-preview:hover { border-color: rgba(0,245,212,0.3); }
+    .photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-preview span { font-size: 13px; color: var(--muted); }
+
+    #modalMap {
+      height: 200px; border-radius: 10px;
+      margin-top: 6px; z-index: 1;
+      border: 1px solid var(--border2);
+    }
+    .map-hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
+
+    .submit-btn {
+      width: 100%; padding: 13px;
+      border-radius: 10px;
+      font-size: 14px; font-weight: 700;
+      background: var(--cyan);
+      color: #0a0a0f;
+      border: none; cursor: pointer;
+      margin-top: 8px;
+      font-family: 'Syne', sans-serif;
+      letter-spacing: 0.3px;
+      transition: all 0.2s;
+      box-shadow: 0 0 30px rgba(0,245,212,0.3);
+    }
+    .submit-btn:hover {
+      background: #00e5c5;
+      box-shadow: 0 0 40px rgba(0,245,212,0.5);
+    }
+
+    /* TOAST */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 13px 20px; border-radius: 10px;
+      font-size: 13px; font-weight: 500;
+      opacity: 0; transform: translateY(10px);
+      transition: all 0.3s; z-index: 999; pointer-events: none;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--surface); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+  <div class="navbar">
+    <div style="display:flex;align-items:center">
+      <span class="nav-logo">Campus<span>Trace</span></span>
+      <span class="nav-sub">JNTUH Lost & Found</span>
+    </div>
+    <div class="nav-btns">
+      <button class="btn-lost" onclick="openModal('Lost')">+ Report Lost</button>
+      <button class="btn-found" onclick="openModal('Found')">+ Report Found</button>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-tag">✦ Live Campus Board</div>
+    <h1>Lost something?<br><em>Let's find it.</em></h1>
+    <p><span>AI-powered matching</span> · Campus map · Humanity Score leaderboard</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card red">
+      <div class="stat-num red" id="stat-lost">0</div>
+      <div class="stat-label">Items reported lost</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-num green" id="stat-found">0</div>
+      <div class="stat-label">Items reported found</div>
+    </div>
+    <div class="stat-card gray">
+      <div class="stat-num gray" id="stat-total">0</div>
+      <div class="stat-label">Total posts</div>
+    </div>
+  </div>
+
+  <div class="section-tabs">
+    <div class="stab active" onclick="showSection('board',this)">📋 Posts Board</div>
+    <div class="stab" onclick="showSection('map',this)">🗺️ Campus Map</div>
+    <div class="stab" onclick="showSection('humanity',this)">❤️ Humanity Score</div>
+  </div>
+
+  <div class="match-banner" id="matchBanner"></div>
+
+  <!-- BOARD -->
+  <div id="boardSection">
+    <div class="controls">
+      <input class="search-box" type="text" id="searchInput" placeholder="🔍  Search by item, location..." oninput="renderCards()"/>
+      <div class="filter-tabs">
+        <div class="ftab active" onclick="setFilter('All',this)">All</div>
+        <div class="ftab" onclick="setFilter('Lost',this)">Lost</div>
+        <div class="ftab" onclick="setFilter('Found',this)">Found</div>
+        <div class="ftab" onclick="setFilter('Urgent',this)">🔴 Urgent</div>
+      </div>
+    </div>
+    <div class="grid" id="cardsGrid"></div>
+  </div>
+
+  <!-- MAP -->
+  <div id="mapSection"><div id="map"></div></div>
+
+  <!-- HUMANITY SCORE -->
+  <div id="humanitySection">
+    <div id="winnerBlock"></div>
+    <div class="lb-title">This week's leaderboard</div>
+    <div id="leaderboard"></div>
+    <div class="reset-note">Leaderboard resets every Monday at 12:00 AM</div>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">Report Lost Item</div>
+        <div class="modal-close" onclick="closeModal()">✕</div>
+      </div>
+      <div class="form-group">
+        <label>Item type</label>
+        <div class="radio-group">
+          <label><input type="radio" name="type" value="Lost" id="radioLost" checked> Lost</label>
+          <label><input type="radio" name="type" value="Found" id="radioFound"> Found</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Mark as urgent?</label>
+        <div class="urgency-toggle">
+          <input type="checkbox" id="isUrgent">
+          <span>🔴 High Priority — ID card, keys, wallet, exam ticket</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Item name *</label>
+        <input type="text" id="itemName" placeholder="e.g. Blue water bottle"/>
+      </div>
+      <div class="form-group">
+        <label>Description *</label>
+        <textarea id="itemDesc" placeholder="Color, size, any marks..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Location on campus *</label>
+        <input type="text" id="itemLocation" placeholder="e.g. Near canteen, Block B"/>
+      </div>
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="itemDate"/>
+      </div>
+      <div class="form-group">
+        <label>Photo (optional)</label>
+        <div class="photo-preview" id="photoPreview" onclick="document.getElementById('photoInput').click()">
+          <span>Click to upload photo</span>
+        </div>
+        <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="previewPhoto(event)"/>
+      </div>
+      <div class="form-group">
+        <label>Pin location on map</label>
+        <div id="modalMap"></div>
+        <p class="map-hint">Click on the map to drop a pin.</p>
+      </div>
+      <div class="form-group">
+        <label>Your name *</label>
+        <input type="text" id="itemPerson" placeholder="Your full name"/>
+      </div>
+      <div class="form-group">
+        <label>Contact (phone or email) *</label>
+        <input type="text" id="itemContact" placeholder="e.g. 9876543210"/>
+      </div>
+      <button class="submit-btn" onclick="submitPost()">Submit Post →</button>
+    </div>
+  </div>
+
+  <div class="score-popup" id="scorePopup"></div>
+  <div class="toast" id="toast"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    let posts    = JSON.parse(localStorage.getItem('ct_posts')   || '[]');
+    let scores   = JSON.parse(localStorage.getItem('ct_scores')  || '{}');
+    let weekKey  = getWeekKey();
+    let activeFilter = 'All';
+    let pickedLat = null, pickedLng = null;
+    let photoBase64 = null;
+    let modalMap = null, modalMarker = null, mainMap = null;
+    const JNTUH = [17.4935, 78.3935];
+
+    function getWeekKey() {
+      const now = new Date();
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(now.setDate(diff));
+      return `week_${monday.getFullYear()}_${monday.getMonth()}_${monday.getDate()}`;
+    }
+
+    function getWeekScores() { return scores[weekKey] || {}; }
+
+    function addScore(name, contact, pts) {
+      if (!scores[weekKey]) scores[weekKey] = {};
+      const key = name + '||' + contact;
+      if (!scores[weekKey][key]) scores[weekKey][key] = { name, contact, pts: 0, resolved: 0 };
+      scores[weekKey][key].pts += pts;
+      scores[weekKey][key].resolved += pts >= 10 ? 1 : 0;
+      localStorage.setItem('ct_scores', JSON.stringify(scores));
+      showScorePopup(`+${pts} humanity points to ${name}! 🎉`);
+      renderLeaderboard();
+    }
+
+    function showScorePopup(msg) {
+      const el = document.getElementById('scorePopup');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    function savePosts() { localStorage.setItem('ct_posts', JSON.stringify(posts)); }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+
+    function showSection(sec, el) {
+      document.querySelectorAll('.stab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('boardSection').style.display     = sec === 'board' ? 'block' : 'none';
+      document.getElementById('mapSection').classList.toggle('show',      sec === 'map');
+      document.getElementById('humanitySection').classList.toggle('show', sec === 'humanity');
+      if (sec === 'map') setTimeout(() => initMainMap(), 100);
+      if (sec === 'humanity') renderLeaderboard();
+    }
+
+    function renderLeaderboard() {
+      const ws = getWeekScores();
+      const entries = Object.values(ws).sort((a,b) => b.pts - a.pts);
+      const winner = entries[0];
+      const maxPts = winner ? winner.pts : 1;
+
+      const winnerBlock = document.getElementById('winnerBlock');
+      if (!winner) {
+        winnerBlock.innerHTML = `<div class="no-winner"><h3>No scores yet this week</h3><p>Resolve a lost item to earn your first humanity points!</p></div>`;
+      } else {
+        winnerBlock.innerHTML = `
+          <div class="week-hero">
+            <div class="crown">👑</div>
+            <div class="week-info">
+              <div class="week-label">Helpful Human of the Week</div>
+              <div class="week-name">${winner.name}</div>
+              <div class="week-sub">Helped ${winner.resolved} student${winner.resolved !== 1 ? 's' : ''} find their lost item${winner.resolved !== 1 ? 's' : ''} this week</div>
+              <div class="mini-badges" style="margin-top:8px">
+                <span class="mini-badge mb-gold">Most helpful</span>
+                <span class="mini-badge mb-green">${winner.resolved} items resolved</span>
+              </div>
+            </div>
+            <div class="week-score">
+              <div class="week-score-num">${winner.pts}</div>
+              <div class="week-score-label">humanity pts</div>
+            </div>
+          </div>`;
+      }
+
+      const rankIcons = ['🥇','🥈','🥉'];
+      const rankClass = ['gold','silver','bronze'];
+      const lb = document.getElementById('leaderboard');
+
+      if (entries.length === 0) {
+        lb.innerHTML = `<div style="text-align:center;color:var(--muted);padding:30px">No entries yet. Start resolving items!</div>`;
+        return;
+      }
+
+      lb.innerHTML = entries.map((e, i) => {
+        const initials = e.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+        const barWidth = Math.round((e.pts / maxPts) * 100);
+        const rc = rankClass[i] || '';
+        const ri = rankIcons[i] || `<span style="font-size:13px;color:var(--muted)">${i+1}</span>`;
+        return `
+          <div class="lb-row ${rc}">
+            <div class="rank">${ri}</div>
+            <div class="avatar">${initials}</div>
+            <div class="lb-name">
+              <div class="lb-name-text">${e.name}</div>
+              <div class="heart-bar"><div class="heart-fill" style="width:${barWidth}%"></div></div>
+            </div>
+            <div class="lb-score-wrap">
+              <div class="lb-score">${e.pts}</div>
+              <div class="lb-score-label">pts this week</div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function initMainMap() {
+      if (mainMap) { mainMap.invalidateSize(); renderMapPins(); return; }
+      mainMap = L.map('map').setView(JNTUH, 17);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mainMap);
+      renderMapPins();
+    }
+
+    function renderMapPins() {
+      if (!mainMap) return;
+      mainMap.eachLayer(l => { if (l instanceof L.Marker) mainMap.removeLayer(l); });
+      posts.forEach(p => {
+        if (!p.lat || !p.lng) return;
+        const icon = L.divIcon({ html: `<div style="font-size:22px">${p.type==='Lost'?'🔴':'🟢'}</div>`, className: '', iconAnchor:[11,22] });
+        L.marker([p.lat,p.lng],{icon}).addTo(mainMap).bindPopup(`<strong>${p.name}</strong><br>${p.type} · ${p.loc}<br>👤 ${p.person}`);
+      });
+    }
+
+    function initModalMap() {
+      if (modalMap) { modalMap.remove(); modalMap = null; }
+      pickedLat = null; pickedLng = null; modalMarker = null;
+      setTimeout(() => {
+        modalMap = L.map('modalMap').setView(JNTUH, 17);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(modalMap);
+        modalMap.on('click', function(e) {
+          pickedLat = e.latlng.lat; pickedLng = e.latlng.lng;
+          if (modalMarker) modalMap.removeLayer(modalMarker);
+          modalMarker = L.marker([pickedLat,pickedLng]).addTo(modalMap);
+        });
+      }, 200);
+    }
+
+    function previewPhoto(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        photoBase64 = e.target.result;
+        document.getElementById('photoPreview').innerHTML = `<img src="${photoBase64}" alt="preview"/>`;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function openModal(type) {
+      document.getElementById('modalOverlay').classList.add('open');
+      document.getElementById('modalTitle').textContent = `Report ${type} Item`;
+      document.getElementById(type==='Lost'?'radioLost':'radioFound').checked = true;
+      document.getElementById('itemDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('isUrgent').checked = false;
+      photoBase64 = null;
+      document.getElementById('photoPreview').innerHTML = '<span>Click to upload photo</span>';
+      initModalMap();
+    }
+
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.remove('open');
+      ['itemName','itemDesc','itemLocation','itemPerson','itemContact'].forEach(id => document.getElementById(id).value = '');
+      if (modalMap) { modalMap.remove(); modalMap = null; }
+    }
+
+    async function checkAIMatch(newPost) {
+      const opp = newPost.type === 'Found' ? 'Lost' : 'Found';
+      const candidates = posts.filter(p => p.type === opp).slice(0, 8);
+      if (!candidates.length) return;
+      const list = candidates.map((p,i) => `${i+1}. Name:"${p.name}", Desc:"${p.desc}", Loc:"${p.loc}", By:${p.person}(${p.contact})`).join('\n');
+      const prompt = `You are a campus lost-and-found assistant.\nNew ${newPost.type} post: Name:"${newPost.name}", Desc:"${newPost.desc}", Loc:"${newPost.loc}"\nExisting ${opp} posts:\n${list}\nDoes any post likely match? Reply ONLY with JSON: {"match":true,"index":1,"reason":"..."} or {"match":false}`;
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:200, messages:[{role:'user',content:prompt}] })
+        });
+        const data = await res.json();
+        const result = JSON.parse(data.content[0].text.trim());
+        if (result.match && result.index) {
+          const m = candidates[result.index-1];
+          const banner = document.getElementById('matchBanner');
+          banner.innerHTML = `🤖 <strong>AI Match Found!</strong> This might match <strong>${m.person}</strong>'s ${opp} post — "${m.name}". Contact: <strong>${m.contact}</strong>. ${result.reason}`;
+          banner.classList.add('show');
+          setTimeout(() => banner.classList.remove('show'), 12000);
+        }
+      } catch(e) { console.log('AI skip',e); }
+    }
+
+    async function submitPost() {
+      const name    = document.getElementById('itemName').value.trim();
+      const desc    = document.getElementById('itemDesc').value.trim();
+      const loc     = document.getElementById('itemLocation').value.trim();
+      const date    = document.getElementById('itemDate').value;
+      const person  = document.getElementById('itemPerson').value.trim();
+      const contact = document.getElementById('itemContact').value.trim();
+      const type    = document.querySelector('input[name="type"]:checked').value;
+      const urgent  = document.getElementById('isUrgent').checked;
+
+      if (!name||!desc||!loc||!person||!contact) { showToast('Please fill all required fields!'); return; }
+
+      const post = { id:Date.now(), name, desc, loc, date, person, contact, type, urgent, photo:photoBase64||null, lat:pickedLat, lng:pickedLng };
+      posts.unshift(post);
+      savePosts();
+
+      if (type === 'Found') addScore(person, contact, 5);
+
+      renderCards();
+      closeModal();
+      showToast('Post added! Checking AI matches...');
+      await checkAIMatch(post);
+    }
+
+    function deletePost(id) {
+      const post = posts.find(p => p.id === id);
+      if (!post) return;
+
+      const resolverName    = prompt('Your name (to earn humanity points):');
+      const resolverContact = prompt('Your contact:');
+      if (!resolverName || !resolverContact) { showToast('Cancelled.'); return; }
+
+      const pts = post.urgent ? 15 : 10;
+      addScore(resolverName, resolverContact, pts);
+      addScore(post.person, post.contact, 5);
+
+      posts = posts.filter(p => p.id !== id);
+      savePosts();
+      renderCards();
+      renderMapPins();
+      showToast(`Resolved! +${pts} humanity points earned by ${resolverName} 🎉`);
+    }
+
+    function setFilter(filter, el) {
+      activeFilter = filter;
+      document.querySelectorAll('.ftab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      renderCards();
+    }
+
+    function updateStats() {
+      document.getElementById('stat-lost').textContent  = posts.filter(p=>p.type==='Lost').length;
+      document.getElementById('stat-found').textContent = posts.filter(p=>p.type==='Found').length;
+      document.getElementById('stat-total').textContent = posts.length;
+    }
+
+    function renderCards() {
+      const query = document.getElementById('searchInput').value.toLowerCase();
+      const grid  = document.getElementById('cardsGrid');
+      let filtered = posts.filter(p => {
+        if (activeFilter==='Urgent') return p.urgent;
+        const mf = activeFilter==='All' || p.type===activeFilter;
+        const ms = p.name.toLowerCase().includes(query) || p.loc.toLowerCase().includes(query) || p.desc.toLowerCase().includes(query);
+        return mf && ms;
+      });
+      filtered.sort((a,b) => (b.urgent?1:0)-(a.urgent?1:0));
+      updateStats();
+      if (!filtered.length) {
+        grid.innerHTML = `<div class="empty-state"><h3>No posts found</h3><p>Try a different search or be the first to report!</p></div>`;
+        return;
+      }
+      grid.innerHTML = filtered.map((p, i) => `
+        <div class="card ${p.urgent?'urgent':''}" style="animation-delay:${i*0.05}s">
+          ${p.photo ? `<img class="card-img" src="${p.photo}" alt="${p.name}"/>` : `<div class="card-img-placeholder">No photo</div>`}
+          <div class="card-body">
+            <div class="card-header">
+              <div class="card-title">${p.name}</div>
+              <div class="badges">
+                <div class="badge badge-${p.type.toLowerCase()}">${p.type}</div>
+                ${p.urgent?`<div class="badge badge-urgent">URGENT</div>`:''}
+              </div>
+            </div>
+            <div class="card-desc">${p.desc}</div>
+            <div class="card-meta">
+              <div>📍 <span>${p.loc}</span></div>
+              <div>📅 <span>${p.date||'Date not specified'}</span></div>
+              <div>👤 <span>${p.person}</span></div>
+              ${p.lat?`<div>🗺️ <span>Location pinned on map</span></div>`:''}
+            </div>
+            <div class="card-footer">
+              <div class="contact-info">📞 ${p.contact}</div>
+              <button class="delete-btn" onclick="deletePost(${p.id})">Resolved ✓</button>
+            </div>
+          </div>
+        </div>`).join('');
+    }
+
+    renderCards();
+  </script>
+</body>
+</html>
